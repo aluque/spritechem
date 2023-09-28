@@ -121,27 +121,6 @@ class DryAir(ch.ReactionSet):
         self.add("O2 + O- + M -> O3- + M",
                PancheshnyiFitEN2(1.1e-30 * co.centi**6, 65))
 
-        # Let us simplify and assume that all + ions are converted to O4+
-        # within 1 us
-        self.add("N2+ -> O4+", ch.Constant(1e9))
-        self.add("O2+ -> O4+", ch.Constant(1e9))
-        
-        self.add("e + O4+ -> ",
-               ch.Interpolate0("swarm/rec_electron.dat", zero_value=0.0,
-                               extend=extend))
-        
-        self.add("O- + O4+ + M -> ",
-               ch.Interpolate0("swarm/rec_ion.dat",
-                               zero_value=0.0, extend=extend))
-        
-        self.add("O2- + O4+ + M -> ",
-               ch.Interpolate0("swarm/rec_ion.dat",
-                               zero_value=0.0, extend=extend))
-        
-        self.add("O3- + O4+ + M -> ",
-               ch.Interpolate0("swarm/rec_ion.dat",
-                               zero_value=0.0, extend=extend))
-
         # Add available vibrational levels
         for v in range(1, 7):
             self.add(f"e + N2 -> e + N2(v{v})",
@@ -152,6 +131,36 @@ class DryAir(ch.ReactionSet):
                  ch.Interpolate0(f"swarm/k003.dat",
                                  extend=extend))
             
+
+        # Positive ions
+        self.add("N2+ + N2 + M -> N4+ + M",
+                 TemperaturePower(5e-29 * co.centi**6, 3),
+                 ref="Aleksandrov1999/PSST")
+        
+        self.add("N4+ + O2 -> 2 * N2 + O2+",
+                 TemperaturePower(2.5e-10 * co.centi**3, 3),
+                 ref="Aleksandrov1999/PSST")
+
+
+        self.add("O2+ + O2 + M -> O4+ + M",
+                 TemperaturePower(2.4e-30 * co.centi**6, 3),
+                 ref="Aleksandrov1999/PSST")
+
+
+        # Recombination
+        self.add("e + O4+ -> ",
+                 ch.Interpolate0("swarm/rec_electron.dat", zero_value=0.0,
+                                 extend=extend))
+        
+        # Add bulk recombination reactions
+        pos = [s for s in self.species if '+' in s] 
+        neg = [s for s in self.species if '-' in s] 
+        self.add_pattern("{pos} + {neg} -> ",
+                         {'pos': pos, 'neg': neg},
+                         ch.Constant(1e-7 * co.centi**3),
+                         generic="A+ + B- -> ", 
+                         ref="Kossyi1992/PSST")
+        
         
         self.initialize()
 
@@ -267,7 +276,7 @@ if __name__ == '__main__':
 
     parser.add_argument("--tend", "-t", action="store",
                         type=float,
-                        help="Final time in seconde")
+                        help="Final time in seconds")
     
     args = parser.parse_args()
 
