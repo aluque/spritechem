@@ -1,8 +1,11 @@
+import sys
+
 import numpy as np
 import scipy.constants as co
 from scipy.interpolate import interp1d
 from scipy.integrate import ode
-
+import string
+from waccm import WACCM
 
 import chemise as ch
 
@@ -12,16 +15,35 @@ N_N2 = 0.78 * NAIR
 N_O2 = 0.22 * NAIR
 TEMPERATURE = 200 # in K
 
-def main(field, model, tend):
+def main(field, model, tend, latex=False):
     # init reaction set
     rs = DryAir(associative_detachment_model=model)
     rs.print_summary()
 
+    waccm = WACCM("waccm_fg_l38.dat")
+    W = waccm(H)
+    
+    if args.latex:
+        write_latex(rs)
+        print("LaTeX file written")
+        sys.exit(0)
+
+        
     n0 = rs.zero_densities(1)
+
     # approx. density at 80 km
-    rs.set_species(n0, 'e', 10 * co.centi**-3)
+    rs.set_species(n0, 'e', 10e4 * co.centi**-3)
     rs.set_species(n0, 'N2', N_N2)
     rs.set_species(n0, 'O2', N_O2)
+    for s in ['O3', 'H2', 'CO', 'O', 'NO', 'NO2']:
+        try:
+            rs.set_species(n0, s, W[s])
+        except KeyError:
+            pass
+
+    # See e.g. Emmert 2012. below ~80 km ppm is about the same as at ground
+    # level
+    rs.set_species(n0, 'CO2', 370e-6 * NAIR)
     
     # Boltzmann population of vibrational levels
     hw = 0.28 * co.eV
@@ -35,6 +57,7 @@ def main(field, model, tend):
     time = np.linspace(0, tend, 1 + int(100 * tend / 1e-3))
     n = rs.zero_densities(len(time))
 
+
     # closure to compute derivatives
     def f(t, n):
         return rs.fderivs(n[:, np.newaxis], en, T)
@@ -46,7 +69,7 @@ def main(field, model, tend):
     for en1 in field:
         r = ode(f)
         r.set_integrator('vode', method='bdf', nsteps=2000,
-                         rtol=np.full_like(n0, 1e-5))
+                         rtol=np.full_like(n0, 1e-8))
         
         n[:, 0] = np.squeeze(n0)
         r.set_initial_value(n0, time[0])
@@ -61,7 +84,7 @@ def main(field, model, tend):
     
         # time-marching
         for i, it in enumerate(time[1:]):
-            if ((i + 1) % 20 == 0):
+            if ((i + 1) % 500 == 0):
                 percent = 100 * it / time[-1]
                 print(f"...at time t = {1e6 * it:.1f} us ({percent:.1f}%)")
                 
@@ -75,63 +98,81 @@ class DryAir(ch.ReactionSet):
     def __init__(self, associative_detachment_model="only-vib", extend=False):
         super(DryAir, self).__init__()
         
-        self.compose({'M': {'N2': 1.0, 'O2': 1.0},
-                      'N2v': {'N2(v1)': 1.0,
-                              'N2(v2)': 1.0,
-                              'N2(v3)': 1.0,
-                              'N2(v4)': 1.0,
-                              'N2(v5)': 1.0,
-                              'N2(v6)': 1.0}})
+        self.compose({'M': {'N2': 1.0, 'O2': 1.0}})
 
         self.add("e + N2 -> 2 * e + N2+",
-                 ch.LogLogInterpolate0("swarm/k025.dat", extend=extend))
-
+                 ch.LogLogInterpolate0("swarm/k025.dat", extend=extend),
+                 ref="Lawton1978/JChPh, Phelps1985/PhRvA, Hagelaar2005/PSST")
+    
         self.add("e + O2 -> 2 * e + O2+", 
-                 ch.LogLogInterpolate0("swarm/k042.dat", extend=extend))
+                 ch.LogLogInterpolate0("swarm/k042.dat", extend=extend),
+                 ref="Lawton1978/JChPh, Phelps1985/PhRvA, Hagelaar2005/PSST")
 
         self.add("e + O2 + O2 -> O2- + O2",
                  ch.LogLogInterpolate0("swarm/k026.dat",
                                        prefactor=(1 / co.centi**-3),
-                                       extend=extend))
+                                       extend=extend),
+                 ref="Lawton1978/JChPh, Phelps1985/PhRvA, Hagelaar2005/PSST")
 
         self.add("e + O2 -> O + O-",
-               ch.LogLogInterpolate0("swarm/k027.dat", extend=extend))
+                 ch.LogLogInterpolate0("swarm/k027.dat", extend=extend),
+                 ref="Lawton1978/JChPh, Phelps1985/PhRvA, Hagelaar2005/PSST")
 
         self.add("M + O2- -> e + O2 + M",
-               PancheshnyiFitEN(1.24e-11 * co.centi**3, 179, 8.8))
+                 PancheshnyiFitEN(1.24e-11 * co.centi**3, 179, 8.8),
+                 ref="Pancheshnyi2013/JPhD")
                
         self.add("O2 + O- -> O2- + O",
-               PancheshnyiFitEN(6.96e-11 * co.centi**3, 198, 5.6))
+                 PancheshnyiFitEN(6.96e-11 * co.centi**3, 198, 5.6),
+                 ref="Pancheshnyi2013/JPhD")
 
         #
         #                 - associative detachment -
         # ======================================================================
-        if associative_detachment_model == "pancheshnyi":
+        if associative_detachment_model == "rm78":
             # This is the old rate from Pancheshnyi
             self.add("N2 + O- -> e + N2O",
                      PancheshnyiFitEN(1.16e-12 * co.centi**3, 48.9, 11))
 
-        elif associative_detachment_model == "only-vib":        
+        elif associative_detachment_model == "current":
             # From Viggiano et al. N2v represents N2(v > 0)
-            self.add("N2v + O- -> e + N2O",
-                     ch.Constant(3.2e-12 * co.centi**3))
+            # self.add("N2v + O- -> e + N2O",
+            #          ch.Constant(3.2e-12 * co.centi**3))
+            self.add("N2 + O- -> e + N2O", ch.Constant(8e-21 * co.centi**3),
+                     ref="Viggiano2023/submitted")
+            self.add("N2(v1) + O- -> e + N2O", ch.Constant(2e-13 * co.centi**3),
+                     ref="Viggiano2023/submitted")
+            self.add("N2(v2) + O- -> e + N2O", ch.Constant(3.5e-12 * co.centi**3),
+                     ref="Viggiano2023/submitted")
+            self.add("N2(v3) + O- -> e + N2O", ch.Constant(3.5e-12 * co.centi**3),
+                     ref="Viggiano2023/submitted")
+            self.add("N2(v4) + O- -> e + N2O", ch.Constant(3.5e-12 * co.centi**3),
+                     ref="Viggiano2023/submitted")
+            self.add("N2(v5) + O- -> e + N2O", ch.Constant(3.5e-12 * co.centi**3),
+                     ref="Viggiano2023/submitted")
+            self.add("N2(v6) + O- -> e + N2O", ch.Constant(3.5e-12 * co.centi**3),
+                     ref="Viggiano2023/submitted")
+            
+            
         # ======================================================================
         #
         
         self.add("O2 + O- + M -> O3- + M",
-               PancheshnyiFitEN2(1.1e-30 * co.centi**6, 65))
+                 PancheshnyiFitEN2(1.1e-30 * co.centi**6, 65), ref="Pancheshnyi2013/JPhD")
 
         # Add available vibrational levels
         for v in range(1, 7):
             self.add(f"e + N2 -> e + N2(v{v})",
                      ch.Interpolate0(f"swarm/k{3+v:03d}.dat",
-                                     extend=extend))
+                                     extend=extend),
+                     ref="Lawton1978/JChPh, Phelps1985/PhRvA, Hagelaar2005/PSST")
+
         # the n2(v1res) part of v=1 excitation
         self.add(f"e + N2 -> e + N2(v1)",
                  ch.Interpolate0(f"swarm/k003.dat",
-                                 extend=extend))
+                                 extend=extend),
+                 ref="Lawton1978/JChPh, Phelps1985/PhRvA, Hagelaar2005/PSST")
             
-
         # Positive ions
         self.add("N2+ + N2 + M -> N4+ + M",
                  TemperaturePower(5e-29 * co.centi**6, 3),
@@ -148,10 +189,11 @@ class DryAir(ch.ReactionSet):
 
 
         # Recombination
-        self.add("e + O4+ -> ",
+        self.add("e + O4+ -> O2 + O2",
                  ch.Interpolate0("swarm/rec_electron.dat", zero_value=0.0,
-                                 extend=extend))
-        
+                                 extend=extend),
+                 ref="Kossyi1992/PSST")
+
         # Add bulk recombination reactions
         pos = [s for s in self.species if '+' in s] 
         neg = [s for s in self.species if '-' in s] 
@@ -161,7 +203,31 @@ class DryAir(ch.ReactionSet):
                          generic="A+ + B- -> ", 
                          ref="Kossyi1992/PSST")
         
+        # Set of reactions proposed by Nick
+
+
+        self.add("O- + O3 -> O3- + O",
+                 TemperaturePower(1.1e-9 * co.centi**3, 0.14))
+        self.add("O- + O3 -> O2- + O2",
+                 TemperaturePower(1.3e-9 * co.centi**3, 0.14))
+        self.add("O- + CO2 + M -> CO3- + M",
+                 TemperaturePower(3e-28 * co.centi**6, -1.5))
+        self.add("O- + H2 -> H2O + e",
+                 TemperaturePower(6e-10 * co.centi**3, -0.25))
+        self.add("O- + H2 -> OH- + H",
+                 TemperatureExp(8e-11 * co.centi**3, 200 * co.h * co.c / co.k))
+        self.add("O- + CO -> CO2 + e",
+                 TemperaturePower(6e-10 * co.centi**3, -0.20))
+        self.add("O- + O -> O2 + e",
+                 TemperaturePower(1.5e-10 * co.centi**3, -1.2))
+        self.add("O- + NO -> NO2 + e",
+                 TemperaturePower(2.9e-10 * co.centi**3, -0.7))
+        self.add("O- + NO2 -> NO2- + O",
+                 ch.Constant(2.9e-10 * co.centi**3))
         
+        # This one is already accounted for:
+        # self.add("O- + O2 + M -> O3- + M",
+        #          TemperaturePower(1e-30 * co.centi**6, -1.5))
         self.initialize()
 
 
@@ -178,12 +244,24 @@ class TemperaturePower(ch.Rate):
         self.T0 = T0
 
     def __call__(self, EN, T):
-        return full_like(EN, self.k0 * (self.T0 / T)** self.power)
+        return np.full_like(EN, self.k0 * (self.T0 / T)** self.power)
 
     def latex(self):
         return (r"$\num{%g} \times (\num{%g} / T)^{\num{%g}}$"
                 % (self.k0, self.T0, self.power))
 
+class TemperatureExp(ch.Rate):
+    def __init__(self, k0, T0):
+        self.k0 = k0
+        self.T0 = T0
+
+    def __call__(self, EN, T):
+        return np.full_like(EN, self.k0 * np.exp(self.T0 / T))
+
+    def latex(self):
+        return (r"$\num{%g} \times \exp(\num{%g} / T)$"
+                % (self.k0, self.T0))
+    
 
 class ETemperaturePower(ch.LogLogInterpolate0):
     def __init__(self, k0, power, *args, T0=300, **kwargs):
@@ -196,7 +274,7 @@ class ETemperaturePower(ch.LogLogInterpolate0):
 
     def __call__(self, EN, T):
         Te = 2 * np.exp(self.s(log(EN))) / (3 * co.k)
-        return full_like(EN, self.k0 * (self.T0 / Te)** self.power)
+        return np.full_like(EN, self.k0 * (self.T0 / Te)** self.power)
 
     def latex(self):
         return (r"$\num{%g} \times (\num{%g} / T_e)^{\num{%g}}$"
@@ -260,15 +338,28 @@ class Gallimberti(ch.Rate):
         
         return self.k0 * np.exp(self.deltag / (co.k * Ti))
 
+def write_latex(chem, pdf=False, name="chemistry.tex"):
+    with open("template.tex", "r") as ftempl:
+        latex_template = string.Template(ftempl.read())
+        
+    with open(name, 'w') as flatex:
+        flatex.write(latex_template.safe_substitute(
+            reaction_table=chem.latex(),
+            nreactions=str(chem.nreactions),
+            nspecies=str(chem.nspecies)))
+        
+    if pdf:
+        subprocess.call("latexmk -pdf %s" % self.name, shell=True)
 
+            
 if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", "-m",
                         help="Dissociative attachment model",
-                        choices=["only-vib", "pancheshnyi"],
-                        default="only-vib")
+                        choices=["rm78", "current"],
+                        default="current")
 
     parser.add_argument("--field", "-e", action="store", nargs="+",
                         type=float,
@@ -277,7 +368,11 @@ if __name__ == '__main__':
     parser.add_argument("--tend", "-t", action="store",
                         type=float,
                         help="Final time in seconds")
+
+    parser.add_argument("--latex", "-L", action="store_true",
+                        default=False,
+                        help="Produce latex output?")
     
     args = parser.parse_args()
 
-    main(args.field, args.model, args.tend)
+    main(args.field, args.model, args.tend, latex=args.latex)
