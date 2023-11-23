@@ -14,6 +14,7 @@ NAIR = co.value('Loschmidt constant (273.15 K, 101.325 kPa)') * np.exp(-H / 7.2e
 N_N2 = 0.78 * NAIR
 N_O2 = 0.22 * NAIR
 TEMPERATURE = 200 # in K
+Td = 1.0e-21
 
 def main(field, model, tend, latex=False):
     # init reaction set
@@ -138,20 +139,12 @@ class DryAir(ch.ReactionSet):
             # From Viggiano et al. N2v represents N2(v > 0)
             # self.add("N2v + O- -> e + N2O",
             #          ch.Constant(3.2e-12 * co.centi**3))
-            self.add("N2 + O- -> e + N2O", ch.Constant(8e-21 * co.centi**3),
-                     ref="Viggiano2023/submitted")
-            self.add("N2(v1) + O- -> e + N2O", ch.Constant(2e-13 * co.centi**3),
-                     ref="Viggiano2023/submitted")
-            self.add("N2(v2) + O- -> e + N2O", ch.Constant(3.5e-12 * co.centi**3),
-                     ref="Viggiano2023/submitted")
-            self.add("N2(v3) + O- -> e + N2O", ch.Constant(3.5e-12 * co.centi**3),
-                     ref="Viggiano2023/submitted")
-            self.add("N2(v4) + O- -> e + N2O", ch.Constant(3.5e-12 * co.centi**3),
-                     ref="Viggiano2023/submitted")
-            self.add("N2(v5) + O- -> e + N2O", ch.Constant(3.5e-12 * co.centi**3),
-                     ref="Viggiano2023/submitted")
-            self.add("N2(v6) + O- -> e + N2O", ch.Constant(3.5e-12 * co.centi**3),
-                     ref="Viggiano2023/submitted")
+            self.add("N2 + O- -> e + N2O", ModArrhenius(3.98e-17, 5097, -1.36),
+                     ref="Schuman2023/PhysChem")
+            self.add("N2(v1) + O- -> e + N2O", ModArrhenius(9.04e-18, 674, -0.85),
+                     ref="Schuman2023/PhysChem")
+            self.add("N2(v2) + O- -> e + N2O", ModArrhenius(2.74e-17, 186, -1.10),
+                     ref="Schuman2023/PhysChem")
             
             
         # ======================================================================
@@ -203,27 +196,31 @@ class DryAir(ch.ReactionSet):
                          generic="A+ + B- -> ", 
                          ref="Kossyi1992/PSST")
         
-        # Set of reactions proposed by Nick
+        # Set of reactions proposed by Nick note change in sign in the
+        # exponent because in TemperaturePower I use (T0/T) while he sets (T/T0)
 
-
-        self.add("O- + O3 -> O3- + O",
-                 TemperaturePower(1.1e-9 * co.centi**3, 0.14))
-        self.add("O- + O3 -> O2- + O2",
-                 TemperaturePower(1.3e-9 * co.centi**3, 0.14))
-        self.add("O- + CO2 + M -> CO3- + M",
-                 TemperaturePower(3e-28 * co.centi**6, -1.5))
-        self.add("O- + H2 -> H2O + e",
-                 TemperaturePower(6e-10 * co.centi**3, -0.25))
-        self.add("O- + H2 -> OH- + H",
-                 TemperatureExp(8e-11 * co.centi**3, 200 * co.h * co.c / co.k))
-        self.add("O- + CO -> CO2 + e",
-                 TemperaturePower(6e-10 * co.centi**3, -0.20))
+        # self.add("O- + O3 -> O3- + O",
+        #          TemperaturePower(1.1e-9 * co.centi**3, -0.14))
+        # self.add("O- + O3 -> O2- + O2",
+        #          TemperaturePower(1.3e-9 * co.centi**3, -0.14))
+        # self.add("O- + CO2 + M -> CO3- + M",
+        #          TemperaturePower(3e-28 * co.centi**6, 1.5))
+        # self.add("O- + H2 -> H2O + e",
+        #          TemperaturePower(6e-10 * co.centi**3, 0.25))
+        # self.add("O- + H2 -> OH- + H",
+        #          TemperatureExp(8e-11 * co.centi**3, 200 * co.h * co.c / co.k))
+        # self.add("O- + CO -> CO2 + e",
+        #          TemperaturePower(6e-10 * co.centi**3, 0.20))
+        # self.add("O- + O -> O2 + e",
+        #          TemperaturePower(1.5e-10 * co.centi**3, 1/2))
         self.add("O- + O -> O2 + e",
-                 TemperaturePower(1.5e-10 * co.centi**3, -1.2))
-        self.add("O- + NO -> NO2 + e",
-                 TemperaturePower(2.9e-10 * co.centi**3, -0.7))
-        self.add("O- + NO2 -> NO2- + O",
-                 ch.Constant(2.9e-10 * co.centi**3))
+                 ModArrhenius(1.5e-10 * co.centi**3, 0.0, -1/2),
+                 mgas=15.999 * co.gram / co.Avogadro, K0=4.5 * co.centi**2,
+                 ref="Ard2013/JChPh")
+        # self.add("O- + NO -> NO2 + e",
+        #          TemperaturePower(2.9e-10 * co.centi**3, 0.7))
+        # self.add("O- + NO2 -> NO2- + O",
+        #          ch.Constant(2.9e-10 * co.centi**3))
         
         # This one is already accounted for:
         # self.add("O- + O2 + M -> O3- + M",
@@ -295,9 +292,9 @@ class PancheshnyiFitEN(ch.Rate):
         params = ["$%s = \\num{%g}$" % (s, getattr(self, s))
                   for s in ('k_0', 'a', 'b')]
 
-        return ("$k_0e^{-\\left(\\frac{a}{b + E/n}\\right)^2}$ [%s]"
-                % ", ".join(params))
-
+        row1 = "$k_0e^{-\\left(\\frac{a}{b + E/n}\\right)^2}$"
+        row2 = "%s" % ", ".join(params)
+        return "\\makecell{%s\\\\%s}" % (row1, row2)
 
 class PancheshnyiFitEN2(ch.Rate):
     def __init__(self, k0, a):
@@ -308,9 +305,9 @@ class PancheshnyiFitEN2(ch.Rate):
         self.k_0 = self.k0
         params = ["$%s = \\num{%g}$" % (s, getattr(self, s))
                   for s in ('k_0', 'a')]
-
-        return ("$k_0e^{-\\left(\\frac{E/n}{a}\\right)^2}$ [%s]"
-                % ", ".join(params))
+        row1 = "$k_0e^{-\\left(\\frac{E/n}{a}\\right)^2}$"
+        row2 = "%s" % ", ".join(params)
+        return "\\makecell{%s\\\\%s}" % (row1, row2)
 
     def __call__(self, EN, T):
         return self.k0 * np.exp(-(EN / self.a)**2)
@@ -327,9 +324,12 @@ class Gallimberti(ch.Rate):
                   for s, v in (('k_0', self.k0),
                                ('\Delta G', self.deltag))]
 
-        return ("$k_0 e^{\\left(\\frac{\Delta G}{kT_i}\\right)}$ [%s]"
-                % ", ".join(params))
-        # return ("$k_0 e^{\\left(\\frac{\Delta G}{kT_i}\\right)}; T_i=T + \\frac{1}{g}\\frac{E}{n}$ [%s]"
+        row1 = "$k_0 e^{\\left(\\frac{\Delta G}{kT_i}\\right)}$"
+        row2 = "%s" % ", ".join(params)
+
+        return "\\makecell{%s\\\\%s}" % (row1, row2)
+
+    # return ("$k_0 e^{\\left(\\frac{\Delta G}{kT_i}\\right)}; T_i=T + \\frac{1}{g}\\frac{E}{n}$ [%s]"
         #         % ", ".join(params))
         
 
@@ -338,13 +338,38 @@ class Gallimberti(ch.Rate):
         
         return self.k0 * np.exp(self.deltag / (co.k * Ti))
 
-def write_latex(chem, pdf=False, name="chemistry.tex"):
-    with open("template.tex", "r") as ftempl:
-        latex_template = string.Template(ftempl.read())
+
+class ModArrhenius(ch.Rate):
+    def __init__(self, k0, T0, d,
+                 Tgas=200, mgas=28.02 * co.gram / co.Avogadro,
+                 K0=4.5 * co.centi**2):
+        self.k0 = k0
+        self.T0 = T0
+        self.d = d
+        self.mgas = mgas
+        self.K0 = K0
+
+    def latex(self):
+        return ("$\\num{%.2g} \\times (T_\\text{eff}/300)^{%.2f} \\exp(-%d/T_\\text{eff})$ "
+                % (self.k0, self.d, self.T0))
+
+    def __call__(self, EN, T):
+        vd = NAIR * self.K0 * EN * Td
+        Teff = T + self.mgas * vd**2 / (3 * co.k)
+        k = self.k0 * (Teff / 300)**self.d * np.exp(-self.T0 / Teff)
+        return k
         
+        
+def write_latex(chem, pdf=False, name="../paper/chemistry.tex"):
+    with open("small_template.tex", "r") as ftempl:
+        latex_template = string.Template(ftempl.read())
+
+    latex_tbl = chem.latex()
+    latex_tbl = latex_tbl.replace("$f(x_0)$", "Bolsig+")
+    
     with open(name, 'w') as flatex:
         flatex.write(latex_template.safe_substitute(
-            reaction_table=chem.latex(),
+            reaction_table=latex_tbl,
             nreactions=str(chem.nreactions),
             nspecies=str(chem.nspecies)))
         
