@@ -1,0 +1,48 @@
+% This latex has been produced automatically.
+\documentclass{article}
+
+%\usepackage{amsmath}
+\usepackage{siunitx}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage[varg]{txfonts}
+\usepackage{graphicx}
+\usepackage{empheq}
+\usepackage[version=3]{mhchem}
+\usepackage{pdflscape}
+\usepackage{longtable}
+\usepackage[table]{xcolor}
+\usepackage{geometry}
+\usepackage{cprotect}
+\geometry{a4paper, landscape, margin=1cm}
+
+\date{\today}
+\title{Chemical model}
+
+\begin{document}
+\pagestyle{empty}
+\maketitle
+\section{Reactions}
+  \rowcolors{2}{blue!7}{white}
+  \begin{longtable}{p{5em}lllp{6cm}}
+    \rowcolor{blue!20}
+    \rule{0pt}{2em} & \textbf{Reaction} & & \textbf{Rate (\si{m^{3(n-1)}s^{-1}})} & \textbf{Reference} \\
+    ${reaction_table}
+  \end{longtable}
+
+${nreactions} reactions, ${nspecies} species
+    
+\newcommand{\jcp}{J. Chem. Phys. } 
+\newcommand{\ssr}{Space Sci. Rev.} 
+\newcommand{\planss}{Plan. Spac. Sci.} 
+\newcommand{\pre}{Phys. Rev. E} 
+\newcommand{\nat}{Nature} 
+\newcommand{\icarus}{Icarus} 
+\newcommand{\ndash}{-} 
+\newcommand{\plusmn}{\ensuremath{\pm}}
+\bibliographystyle{apalike}
+
+% Change this if you want to use another bibliography name.
+\bibliography{library}
+
+\end{document}
