@@ -4,13 +4,7 @@
 This code implements the chemical model described in the paper "Associative electron detachment in sprites" by A. Malagón-Romero _et al._ (under review).
 
 ## Requirements
-The code requres the [CHEMISE python library](https://gitlab.com/aluque/chemise) that can be installed 
-with
-```
-pip install chemise
-```
-
-NumPy and SciPy are also required.
+The code requres the [CHEMISE python library](https://gitlab.com/aluque/chemise). NumPy and SciPy are also required.
 
 ## Use
 ```
