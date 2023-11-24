@@ -44,7 +44,7 @@ def main(field, model, tend, latex=False):
 
     # See e.g. Emmert 2012. below ~80 km ppm is about the same as at ground
     # level
-    rs.set_species(n0, 'CO2', 370e-6 * NAIR)
+    # rs.set_species(n0, 'CO2', 370e-6 * NAIR)
     
     # Boltzmann population of vibrational levels
     hw = 0.28 * co.eV
