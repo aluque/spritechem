@@ -49,7 +49,7 @@ def main(field, model, tend, latex=False):
     # Boltzmann population of vibrational levels
     hw = 0.28 * co.eV
     kT = co.k * 200    
-    for v in range(1, 7):
+    for v in range(1, 3):
         rs.set_species(n0, f'N2(v{v})', N_N2 * np.exp(-v * hw / kT))
         
     en = np.array([0.0])
@@ -154,7 +154,7 @@ class DryAir(ch.ReactionSet):
                  PancheshnyiFitEN2(1.1e-30 * co.centi**6, 65), ref="Pancheshnyi2013/JPhD")
 
         # Add available vibrational levels
-        for v in range(1, 7):
+        for v in range(1, 3):
             self.add(f"e + N2 -> e + N2(v{v})",
                      ch.Interpolate0(f"swarm/k{3+v:03d}.dat",
                                      extend=extend),
