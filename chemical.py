@@ -213,10 +213,10 @@ class DryAir(ch.ReactionSet):
         #          TemperaturePower(6e-10 * co.centi**3, 0.20))
         # self.add("O- + O -> O2 + e",
         #          TemperaturePower(1.5e-10 * co.centi**3, 1/2))
-        self.add("O- + O -> O2 + e",
-                 ModArrhenius(1.5e-10 * co.centi**3, 0.0, -1/2),
-                 mgas=15.999 * co.gram / co.Avogadro, K0=4.5 * co.centi**2,
-                 ref="Ard2013/JChPh")
+        # self.add("O- + O -> O2 + e",
+        #          ModArrhenius(1.5e-10 * co.centi**3, 0.0, -1/2),
+        #          mgas=15.999 * co.gram / co.Avogadro, K0=4.5 * co.centi**2,
+        #          ref="Ard2013/JChPh")
         # self.add("O- + NO -> NO2 + e",
         #          TemperaturePower(2.9e-10 * co.centi**3, 0.7))
         # self.add("O- + NO2 -> NO2- + O",
