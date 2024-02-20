@@ -24,7 +24,7 @@ def main(field, model, tend, latex=False):
     waccm = WACCM("waccm_fg_l38.dat")
     W = waccm(H)
     
-    if args.latex:
+    if latex:
         write_latex(rs)
         print("LaTeX file written")
         sys.exit(0)
