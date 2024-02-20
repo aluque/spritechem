@@ -168,11 +168,11 @@ class DryAir(ch.ReactionSet):
             
         # Positive ions
         self.add("N2+ + N2 + M -> N4+ + M",
-                 TemperaturePower(5e-29 * co.centi**6, 3),
+                 TemperaturePower(5e-29 * co.centi**6, 2),
                  ref="Aleksandrov1999/PSST")
         
         self.add("N4+ + O2 -> 2 * N2 + O2+",
-                 TemperaturePower(2.5e-10 * co.centi**3, 3),
+                 ch.Constant(2.5e-10 * co.centi**3),
                  ref="Aleksandrov1999/PSST")
 
 
